@@ -12,11 +12,15 @@
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
  *
- *	Author: Chris Nussbaum
+ *	Original Author: Chris Nussbaum
  *	Date: 04/19/2017
+ *
+ * 	Updated by: Nick Richardson
+ *	Date: 01-28-2018
  *
  *	Changelog:
  *
+ *  0.17 (01-28-2018) - Adjusting level with z-wave command will use dim rate parameters instead of jumping directly
  *  0.16 (08/03/2017) - Fix bug with status not getting updated when turned on/off from SmartThings
  *  0.15 (04/28/2017) - Fix bug with setting level to 100%
  *  0.14 (04/24/2017) - Fix bug in setting and refreshing dimmer delays
