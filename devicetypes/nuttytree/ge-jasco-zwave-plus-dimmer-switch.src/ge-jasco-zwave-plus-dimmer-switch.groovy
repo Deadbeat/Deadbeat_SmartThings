@@ -20,6 +20,7 @@
  *
  *	Changelog:
  *
+ *  0.18 (01-28-2018) - Fixed fade duration calcualtions
  *  0.17 (01-28-2018) - Adjusting level with z-wave command will use dim rate parameters instead of jumping directly
  *  0.16 (08/03/2017) - Fix bug with status not getting updated when turned on/off from SmartThings
  *  0.15 (04/28/2017) - Fix bug with setting level to 100%
@@ -530,16 +531,15 @@ def setLevel(value) {
 
     log.debug "start level: $startLevel - level: $level"
 	
-    def delay = 0
-    if(startLevel > level) {
-    	log.debug "Calculation: $p1 * $p2 * ($startLevel - $p3) / 100"
-    	delay = Math.round((device.currentValue("zwaveSteps") * device.currentValue("zwaveDelay") * (startLevel-level) / 100)).longValue()
-    } else {
-	    log.debug "Calculation: $p1 * $p2 * $p3 / 100"
-    	delay = Math.round((device.currentValue("zwaveSteps") * device.currentValue("zwaveDelay") * level / 100)).longValue()
+    // Calculate dim duration using:
+    // ((EndingLevel - StartingLevel) / zwaveSteps) * zwaveDelay / 60
+    def dimDuration = Math.round(((level - startLevel) / device.currentValue("zwaveSteps")) * device.currentValue("zwaveDelay") / 60).longValue()
+
+    if(dimDuration < 0) {
+    	dimDuration = dimDuration * -1
     }
-    log.debug "SetLevel - Delay: $delay"
-    setLevel(value,delay)
+    log.debug "SetLevel - dimDuration: $dimDuration"
+    setLevel(value,dimDuration)
 	//log.debug "setLevel - Delay: $delay"
 	//delayBetween ([
     //	zwave.basicV1.basicSet(value: level).format(),
