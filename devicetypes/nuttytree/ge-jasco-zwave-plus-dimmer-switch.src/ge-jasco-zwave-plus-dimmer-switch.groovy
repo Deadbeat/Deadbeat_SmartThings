@@ -20,7 +20,7 @@
  *
  *	Changelog:
  *
- *  0.18 (01-28-2018) - Fixed fade duration calcualtions
+ *  0.18 (01-28-2018) - Fixed fade duration calculations
  *  0.17 (01-28-2018) - Adjusting level with z-wave command will use dim rate parameters instead of jumping directly
  *  0.16 (08/03/2017) - Fix bug with status not getting updated when turned on/off from SmartThings
  *  0.15 (04/28/2017) - Fix bug with setting level to 100%
