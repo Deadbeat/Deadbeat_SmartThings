@@ -38,7 +38,7 @@
  *
  */
 metadata {
-	definition (name: "GE/Jasco Z-Wave Plus Dimmer Switch", namespace: "nuttytree", author: "Chris Nussbaum") {
+	definition (name: "GE/Jasco Z-Wave Plus Dimmer Switch", namespace: "deadbeat", author: "Chris Nussbaum (nuttytree) and Nick Richardson (deadbeat)") {
 		capability "Actuator"
 		capability "Button"
 		capability "Configuration"
@@ -514,6 +514,8 @@ def off() {
     delayBetween(cmds, delay)
 }
 
+/* Smooth dimming when setting level */
+/*
 def setLevel(value) {
 	def startLevel = device.currentValue("level")
     def valueaux = value as Integer
@@ -545,6 +547,20 @@ def setLevel(value) {
     //	zwave.basicV1.basicSet(value: level).format(),
     //    zwave.switchMultilevelV1.switchMultilevelGet().format()
     //], delay )
+}
+*/
+
+/* Original SetLevel */
+log.debug "setLevel >> value: $value"
+	def valueaux = value as Integer
+	def level = Math.max(Math.min(valueaux, 99), 0)
+	if (level > 0) {
+		sendEvent(name: "switch", value: "on")
+	} else {
+		sendEvent(name: "switch", value: "off")
+	}
+	sendEvent(name: "level", value: level, unit: "%")
+	delayBetween ([zwave.basicV1.basicSet(value: level).format(), zwave.switchMultilevelV1.switchMultilevelGet().format()], 5000)
 }
 
 def setLevel(value, duration) {
