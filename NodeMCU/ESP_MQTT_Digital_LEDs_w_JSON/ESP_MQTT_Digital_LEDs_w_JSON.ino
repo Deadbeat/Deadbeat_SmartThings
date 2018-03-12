@@ -7,15 +7,15 @@
   |______/  | _| `.__| \______/  |__|  |__|    /__/     \__\ \______/      |__|      \______/  |__|  |__| /__/     \__\  |__|     |__|  \______/  |__| \__|
 
   Thanks much to @corbanmailloux for providing a great framework for implementing flash/fade with HomeAssistant https://github.com/corbanmailloux/esp-mqtt-rgb-led
-  
-  To use this code you will need the following dependancies: 
-  
-  - Support for the ESP8266 boards. 
+
+  To use this code you will need the following dependancies:
+
+  - Support for the ESP8266 boards.
         - You can add it to the board manager by going to File -> Preference and pasting http://arduino.esp8266.com/stable/package_esp8266com_index.json into the Additional Board Managers URL field.
         - Next, download the ESP8266 dependancies by going to Tools -> Board -> Board Manager and searching for ESP8266 and installing it.
-  
+
   - You will also need to download the follow libraries by going to Sketch -> Include Libraries -> Manage Libraries
-      - FastLED 
+      - FastLED
       - PubSubClient
       - ArduinoJSON
 */
@@ -29,12 +29,13 @@
 #include <ESP8266mDNS.h>
 #include <WiFiUdp.h>
 #include <ArduinoOTA.h>
+#include <string.h>
 
 
 /************ WIFI and MQTT Information (CHANGE THESE FOR YOUR SETUP) ******************/
-const char* ssid = "ssid"; //type your WIFI information inside the quotes
-const char* password = "password";
-const char* mqtt_server = "mqtt_server";
+const char* ssid = "Expecto Potato"; //type your WIFI information inside the quotes
+const char* password = "6f31f8b0d3";
+const char* mqtt_server = "192.168.1.69";
 const char* mqtt_username = "";
 const char* mqtt_password = "";
 const int mqtt_port = 1883;
@@ -42,7 +43,7 @@ const int mqtt_port = 1883;
 
 
 /**************************** FOR OTA **************************************************/
-#define SENSORNAME "sensorname" //change this to whatever you want to call your device
+#define SENSORNAME "KitchenCabinet" //change this to whatever you want to call your device
 
 #define OTApassword "123" //the password you will need to enter to upload remotely via the ArduinoIDE
 int OTAport = 8266;
@@ -50,12 +51,15 @@ int OTAport = 8266;
 
 
 /************* MQTT TOPICS (change these topics as you wish)  **************************/
-const char* light_state_topic = "home/sensorname";
-const char* light_set_topic = "home/sensorname/set";
-const char* light_set_topic_group = "home/sensornamegroup/set";
+const char* light_state_topic = "smartthings/Kitchen Cabinet";
+const char* light_set_topic = "smartthings/Kitchen Cabinet/set";
+const char* light_set_topic_group = "smartthings/Kitchen Cabinet Group/set";
+const char* light_set_switch_topic = "smartthings/Kitchen Cabinet/switch";
+const char* light_set_color_topic = "smartthings/Kitchen Cabinet/color";
+const char* light_set_level_topic = "smartthings/Kitchen Cabinet/level";
 
-const char* on_cmd = "ON";
-const char* off_cmd = "OFF";
+const char* on_cmd = "on";
+const char* off_cmd = "off";
 const char* effect = "solid";
 String effectString = "solid";
 String oldeffectString = "solid";
@@ -69,7 +73,7 @@ const int BUFFER_SIZE = JSON_OBJECT_SIZE(10);
 
 
 /*********************************** FastLED Defintions ********************************/
-#define NUM_LEDS    144
+#define NUM_LEDS    84
 
 #define DATA_PIN    4
 //#define CLOCK_PIN 5
@@ -177,7 +181,7 @@ uint8_t gHue = 0;
 int toggle = 0;
 
 //RANDOM STARS
-const int NUM_STARS = NUM_LEDS/10;
+const int NUM_STARS = NUM_LEDS / 10;
 static int stars[NUM_STARS];
 
 //SINE HUE
@@ -246,7 +250,7 @@ void setup_wifi() {
   Serial.println();
   Serial.print("Connecting to ");
   Serial.println(ssid);
-  
+
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
 
@@ -291,8 +295,47 @@ void callback(char* topic, byte* payload, unsigned int length) {
   message[length] = '\0';
   Serial.println(message);
 
-  if (!processJson(message)) {
-    return;
+  // Process state changes
+  if (strcmp(topic, light_set_switch_topic) == 0) {
+    if (strcmp(message, on_cmd) == 0) {
+      stateOn = true;
+      effect = "solid";
+      effectString = effect;
+    }
+    else if (strcmp(message, off_cmd) == 0) {
+      stateOn = false;
+      onbeforeflash = false;
+    }
+  }
+  // Process level changes
+  else if (strcmp(topic, light_set_level_topic) == 0) {
+    Serial.println("Set Level");
+    Serial.print("Message: ");
+    Serial.println(message);
+    if (strcmp(message, "0") == 0) {
+      Serial.println("Turn off");
+      stateOn = false;
+      onbeforeflash = false;
+    } else {
+      stateOn = true;
+      brightness = atoi(message);
+      brightness = brightness * 2.55;
+      Serial.print("Got level command - setting brightness to: ");
+      Serial.println(brightness);
+    }
+  }
+  // Process color changes
+  else if (strcmp(topic, light_set_color_topic) == 0) {
+    if (!processJson(message)) {
+      return;
+    }
+  }
+  // Catch everything else, assume it's JSON (should never actually get here, but for now this will catch manual messages to trigger effects until we can get ST effects working)
+  else
+  {
+    if (!processJson(message)) {
+      return;
+    }
   }
 
   if (stateOn) {
@@ -308,6 +351,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
     realBlue = 0;
   }
 
+  Serial.print("Current Effect is: ");
   Serial.println(effect);
 
   startFade = true;
@@ -395,14 +439,14 @@ bool processJson(char* message) {
       green = root["color"]["g"];
       blue = root["color"]["b"];
     }
-    
+
     if (root.containsKey("color_temp")) {
       //temp comes in as mireds, need to convert to kelvin then to RGB
       int color_temp = root["color_temp"];
       unsigned int kelvin  = 1000000 / color_temp; //MILLION / color_temp;
-      
+
       temp2rgb(kelvin);
-      
+
     }
 
     if (root.containsKey("brightness")) {
@@ -461,8 +505,26 @@ void reconnect() {
     // Attempt to connect
     if (client.connect(SENSORNAME, mqtt_username, mqtt_password)) {
       Serial.println("connected");
+      Serial.print("Subscribing to ");
+      Serial.println(light_set_topic);
       client.subscribe(light_set_topic);
+
+      Serial.print("Subscribing to ");
+      Serial.println(light_set_topic_group);
       client.subscribe(light_set_topic_group);
+
+      Serial.print("Subscribing to ");
+      Serial.println(light_set_switch_topic);
+      client.subscribe(light_set_switch_topic);
+
+      Serial.print("Subscribing to ");
+      Serial.println(light_set_level_topic);
+      client.subscribe(light_set_level_topic);
+
+      Serial.print("Subscribing to ");
+      Serial.println(light_set_color_topic);
+      client.subscribe(light_set_color_topic);
+
       setColor(0, 0, 0);
       sendState();
     } else {
@@ -780,81 +842,81 @@ void loop() {
 
   //EFFECT CHRISTMAS ALTERNATE
   if (effectString == "christmas alternate") {
-     for (int i = 0; i < NUM_LEDS; i++) {
-        if ((toggle + i) % 2 == 0) {
-          leds[i] = CRGB::Crimson;
-        }
-        else {
-          leds[i] = CRGB::DarkGreen;
-        }
-      }
-      if (toggle == 0) {
-        toggle = 1;
+    for (int i = 0; i < NUM_LEDS; i++) {
+      if ((toggle + i) % 2 == 0) {
+        leds[i] = CRGB::Crimson;
       }
       else {
-        toggle = 0;
+        leds[i] = CRGB::DarkGreen;
       }
-      if (transitionTime == 0 or transitionTime == NULL) {
+    }
+    if (toggle == 0) {
+      toggle = 1;
+    }
+    else {
+      toggle = 0;
+    }
+    if (transitionTime == 0 or transitionTime == NULL) {
       transitionTime = 130;
-      }
-      showleds();   
-      delay(30);
+    }
+    showleds();
+    delay(30);
   }
 
   //EFFECT RANDOM STARS
   if (effectString == "random stars") {
-      if(toggle==0)
-      {        
-        for (int i = 0; i < NUM_STARS; i++)
-        {
-          stars[i] = random(0, NUM_LEDS);
-        }
-        fill_solid (&(leds[0]), NUM_LEDS, CHSV(160, 255, brightness));
-        toggle = 1;
-      }
-      else if (toggle == 1)
+    if (toggle == 0)
+    {
+      for (int i = 0; i < NUM_STARS; i++)
       {
-        for (int j = 0; j < NUM_STARS; j++)
-        {
-          leds[stars[j]] ++;
-        }
-        if (leds[stars[0]].r == 255)
-        {
-          toggle = -1;
-        }
+        stars[i] = random(0, NUM_LEDS);
       }
-      else if (toggle == -1)
+      fill_solid (&(leds[0]), NUM_LEDS, CHSV(160, 255, brightness));
+      toggle = 1;
+    }
+    else if (toggle == 1)
+    {
+      for (int j = 0; j < NUM_STARS; j++)
       {
-        for (int j = 0; j < NUM_STARS; j++)
-        {
-          leds[stars[j]] --; //.fadeLightBy(i);
-        }
-        if (leds[stars[0]] <= CHSV(160, 255, brightness))
-        {
-          toggle = 0;
-        }
+        leds[stars[j]] ++;
       }
-      showleds();        
+      if (leds[stars[0]].r == 255)
+      {
+        toggle = -1;
+      }
+    }
+    else if (toggle == -1)
+    {
+      for (int j = 0; j < NUM_STARS; j++)
+      {
+        leds[stars[j]] --; //.fadeLightBy(i);
+      }
+      if (leds[stars[0]] <= CHSV(160, 255, brightness))
+      {
+        toggle = 0;
+      }
+    }
+    showleds();
   }
 
-//EFFECT "Sine Hue"
+  //EFFECT "Sine Hue"
   if (effectString == "sine hue") {
-      static uint8_t hue_index = 0;
-      static uint8_t led_index = 0;
-      if (led_index >= NUM_LEDS) {  //Start off at 0 if the led_index was incremented past the segment size in some other effect
-        led_index = 0;
-      }
-      for (int i = 0; i < NUM_LEDS; i = i + 1)
-      {
-        leds[i] = CHSV(hue_index, 255, 255 - int(abs(sin(float(i + led_index) / NUM_LEDS * 2 * 3.14159) * 255)));
-      }
+    static uint8_t hue_index = 0;
+    static uint8_t led_index = 0;
+    if (led_index >= NUM_LEDS) {  //Start off at 0 if the led_index was incremented past the segment size in some other effect
+      led_index = 0;
+    }
+    for (int i = 0; i < NUM_LEDS; i = i + 1)
+    {
+      leds[i] = CHSV(hue_index, 255, 255 - int(abs(sin(float(i + led_index) / NUM_LEDS * 2 * 3.14159) * 255)));
+    }
 
-      led_index++,hue_index++;
+    led_index++, hue_index++;
 
-     if (hue_index >= 255) {
-        hue_index = 0;
-      }
-      showleds();        
+    if (hue_index >= 255) {
+      hue_index = 0;
+    }
+    showleds();
   }
 
 
@@ -1152,56 +1214,56 @@ void showleds() {
   }
 }
 void temp2rgb(unsigned int kelvin) {
-    int tmp_internal = kelvin / 100.0;
-    
-    // red 
-    if (tmp_internal <= 66) {
-        red = 255;
+  int tmp_internal = kelvin / 100.0;
+
+  // red
+  if (tmp_internal <= 66) {
+    red = 255;
+  } else {
+    float tmp_red = 329.698727446 * pow(tmp_internal - 60, -0.1332047592);
+    if (tmp_red < 0) {
+      red = 0;
+    } else if (tmp_red > 255) {
+      red = 255;
     } else {
-        float tmp_red = 329.698727446 * pow(tmp_internal - 60, -0.1332047592);
-        if (tmp_red < 0) {
-            red = 0;
-        } else if (tmp_red > 255) {
-            red = 255;
-        } else {
-            red = tmp_red;
-        }
+      red = tmp_red;
     }
-    
-    // green
-    if (tmp_internal <=66){
-        float tmp_green = 99.4708025861 * log(tmp_internal) - 161.1195681661;
-        if (tmp_green < 0) {
-            green = 0;
-        } else if (tmp_green > 255) {
-            green = 255;
-        } else {
-            green = tmp_green;
-        }
+  }
+
+  // green
+  if (tmp_internal <= 66) {
+    float tmp_green = 99.4708025861 * log(tmp_internal) - 161.1195681661;
+    if (tmp_green < 0) {
+      green = 0;
+    } else if (tmp_green > 255) {
+      green = 255;
     } else {
-        float tmp_green = 288.1221695283 * pow(tmp_internal - 60, -0.0755148492);
-        if (tmp_green < 0) {
-            green = 0;
-        } else if (tmp_green > 255) {
-            green = 255;
-        } else {
-            green = tmp_green;
-        }
+      green = tmp_green;
     }
-    
-    // blue
-    if (tmp_internal >=66) {
-        blue = 255;
-    } else if (tmp_internal <= 19) {
-        blue = 0;
+  } else {
+    float tmp_green = 288.1221695283 * pow(tmp_internal - 60, -0.0755148492);
+    if (tmp_green < 0) {
+      green = 0;
+    } else if (tmp_green > 255) {
+      green = 255;
     } else {
-        float tmp_blue = 138.5177312231 * log(tmp_internal - 10) - 305.0447927307;
-        if (tmp_blue < 0) {
-            blue = 0;
-        } else if (tmp_blue > 255) {
-            blue = 255;
-        } else {
-            blue = tmp_blue;
-        }
+      green = tmp_green;
     }
+  }
+
+  // blue
+  if (tmp_internal >= 66) {
+    blue = 255;
+  } else if (tmp_internal <= 19) {
+    blue = 0;
+  } else {
+    float tmp_blue = 138.5177312231 * log(tmp_internal - 10) - 305.0447927307;
+    if (tmp_blue < 0) {
+      blue = 0;
+    } else if (tmp_blue > 255) {
+      blue = 255;
+    } else {
+      blue = tmp_blue;
+    }
+  }
 }
