@@ -52,6 +52,8 @@ metadata {
 	command "yellow"
 	command "white"
 
+	command "brightness"
+    
 	command "solid"
     command "candycane"
     command "confetti"
@@ -309,7 +311,7 @@ def deviceNotification(message) {
 */
 /*** END MQTT COPY ***/
 def on() {
-    sendEvent(name: "switch", value: "on")
+    sendEvent(name: "switch", value: "on", isStateChange: true)
 //    sendEvent(name: "color", value: "{\"color\": {\"r\":255,\"g\":255,\"b\":255}}") // Added this to fix the thing i broke
     def lastColor = device.latestValue("color")
     //log.debug("On pressed.  Sending last known color value of $lastColor or if null command to white.")
@@ -333,7 +335,7 @@ def on() {
 
 def off() {
     toggleTiles("off")
-    sendEvent(name: "switch", value: "off")
+    sendEvent(name: "switch", value: "off", isStateChange: true)
     //log.debug("Off pressed.  Update parent device.")
     //parent.childOff(device.deviceNetworkId)
 }
@@ -379,7 +381,7 @@ def setColor(Map color) {
 def setLevel(value) {
     def level = Math.min(value as Integer, 100)
     // log.debug("Level value in percentage: $level")
-    sendEvent(name: "level", value: level)
+    sendEvent(name: "level", value: level, isStateChange: true)
 	
     // Turn on or off based on level selection
     if (level == 0) { 
@@ -387,7 +389,10 @@ def setLevel(value) {
     } else {
 	    if (device.latestValue("switch") == "off") { on() }
        def color = device.latestValue("color")
-	    adjustColor(color)
+       log.debug("SetLevel: Last color is: $color")
+       
+   	  adjustColor(color) 
+
     }
 }
 
@@ -421,13 +426,20 @@ def adjustColor(inputColor) {
 	if(inputColor.startsWith("{")) {
         def slurper = new JsonSlurper()
         def parsed = slurper.parseText(inputColor)
+	
+		if(parsed.effect) {
+        	setEffect(parsed.effect) 
+            log.debug("Bailing out")
+			return
+            log.debug("You should not see this")
+        } else {
+            def rParsed = parsed.color.r
+            def gParsed = parsed.color.g
+            def bParsed = parsed.color.b
 
-        def rParsed = parsed.color.r
-        def gParsed = parsed.color.g
-        def bParsed = parsed.color.b
-
-        def colorRGB = [red: Math.round(rParsed), green: Math.round(gParsed), blue: Math.round(bParsed)]
-    	colorInHEX = rgbToHex(colorRGB)
+            def colorRGB = [red: Math.round(rParsed), green: Math.round(gParsed), blue: Math.round(bParsed)]
+            colorInHEX = rgbToHex(colorRGB)
+		}
     } else {
     	colorInHEX = inputColor
 	}
@@ -450,7 +462,7 @@ def adjustColor(inputColor) {
 	def colorString = "{\"color\": {\"r\":${c.red},\"g\":${c.green},\"b\":${c.blue}}}"
     log.debug("ColorString: $colorString")
     
-    sendEvent(name: "color", value: colorString)
+    sendEvent(name: "color", value: colorString, isStateChange: true)
 //    sendEvent(name: "color", value: colorInHEX)
     
     //def w = hex(whiteLevel * 255 / 100)
@@ -467,6 +479,12 @@ def adjustColor(inputColor) {
 def setEffect(effectName) {
 	log.debug("Setting Effect to $effectName")
     def effectString = "{\"effect\":\"$effectName\"}"
+    sendEvent(name: "color", value: effectString)
+}
+
+def setBrightness(level) {
+	log.debug("Setting brightness to $level")
+    def effectString = "{\"brightness\":\"$level\"}"
     sendEvent(name: "color", value: effectString)
 }
 
@@ -508,11 +526,11 @@ def getEffectData(effectName) {
 	final effects = [
 	[name:"candycane",	value: "candy cane"],
     [name:"solid",		value: "solid"],
-    [name:"confetti",	value: "confetti"],
+    [name:"confetti",	value: "confetti\", \"transition\":\"40"],
     [name:"cyclonrainbow",		value: "cyclon rainbow"],
     [name:"dots",		value: "dots"],
     [name:"fire",		value: "fire"],
-    [name:"glitter",		value: "glitter"],
+    [name:"glitter",		value: "glitter\", \"transition\":\"40"],
     [name:"juggle",		value: "juggle"],
     [name:"lightning",		value: "lightning"],
     [name:"policeall",		value: "police all"],
@@ -520,8 +538,8 @@ def getEffectData(effectName) {
     [name:"rainbow",		value: "rainbow"],
     [name:"rainbowwithglitter",		value: "rainbow with glitter"],
     [name:"sinelon",		value: "sinelon"],
-    [name:"twinkle",		value: "twinkle"],
-    [name:"randomstars",		value: "random stars"],
+    [name:"twinkle",		value: "twinkle\", \"transition\":\"40"],
+    [name:"randomstars",		value: "random stars\", \"transition\":\"40\", \"brightness\":\"120"],
     [name:"sinehue",		value: "sine hue"],
     [name:"ripple",		value: "ripple"],
     
@@ -693,6 +711,8 @@ def toggleTiles(color) {
 }
 
 // rows of buttons
+def brightness(level) { doBrightness(level) }
+
 def softwhite() { doColorButton("Soft White") }
 def daylight()  { doColorButton("Daylight") }
 def warmwhite() { doColorButton("Warm White") }
