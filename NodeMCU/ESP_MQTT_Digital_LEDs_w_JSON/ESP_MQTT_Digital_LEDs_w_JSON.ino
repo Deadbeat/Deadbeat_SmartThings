@@ -21,6 +21,7 @@
 */
 
 #define FASTLED_INTERRUPT_RETRY_COUNT 0
+#define FASTLED_ALLOW_INTERRUPTS 0
 
 #include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
@@ -43,7 +44,14 @@ const int mqtt_port = 1883;
 
 
 /**************************** FOR OTA **************************************************/
-#define SENSORNAME "KitchenCabinet" //change this to whatever you want to call your device
+// Right cabinet
+#define SENSORNAME "KitchenCabinetRight" //change this to whatever you want to call your device
+#define NUM_LEDS    84
+
+// Left cabinet
+//#define SENSORNAME "KitchenCabinetLeft"
+//#define NUM_LEDS    40
+
 
 #define OTApassword "123" //the password you will need to enter to upload remotely via the ArduinoIDE
 int OTAport = 8266;
@@ -73,7 +81,6 @@ const int BUFFER_SIZE = JSON_OBJECT_SIZE(10);
 
 
 /*********************************** FastLED Defintions ********************************/
-#define NUM_LEDS    84
 
 #define DATA_PIN    4
 //#define CLOCK_PIN 5
@@ -87,7 +94,7 @@ byte realBlue = 0;
 byte red = 255;
 byte green = 255;
 byte blue = 255;
-byte brightness = 64;
+byte brightness = 254;
 
 
 
@@ -282,7 +289,7 @@ void setup_wifi() {
 
 
 
-/********************************** START CALLBACK*****************************************/
+/********************************** START x*****************************************/
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
   Serial.print(topic);
@@ -871,7 +878,8 @@ void loop() {
       {
         stars[i] = random(0, NUM_LEDS);
       }
-      fill_solid (&(leds[0]), NUM_LEDS, CHSV(160, 255, brightness));
+      //fill_solid (&(leds[0]), NUM_LEDS, CHSV(160, 255, brightness));
+      fill_solid (&(leds[0]), NUM_LEDS, CHSV(192, 255, brightness));
       toggle = 1;
     }
     else if (toggle == 1)
@@ -891,7 +899,8 @@ void loop() {
       {
         leds[stars[j]] --; //.fadeLightBy(i);
       }
-      if (leds[stars[0]] <= CHSV(160, 255, brightness))
+      //if (leds[stars[0]] <= CHSV(160, 255, brightness))
+      if (leds[stars[0]] <= CHSV(192, 255, brightness))
       {
         toggle = 0;
       }
